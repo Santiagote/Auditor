@@ -1,0 +1,75 @@
+version: "3.8"
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: sacaudit-redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    container_name: sacaudit-api
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    depends_on:
+      - redis
+    volumes:
+      - media_volume:/app/media
+      - static_volume:/app/staticfiles
+    environment:
+      - DJANGO_DEBUG=False
+      - SACARF_API_BASE_URL=http://sacarf-api:8000/api/v1
+      - CELERY_BROKER_URL=redis://redis:6379/0
+
+  celery_worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    container_name: sacaudit-celery-worker
+    restart: unless-stopped
+    depends_on:
+      - redis
+      - api
+    command: celery -A config worker --loglevel=info
+    environment:
+      - DJANGO_DEBUG=False
+      - SACARF_API_BASE_URL=http://sacarf-api:8000/api/v1
+      - CELERY_BROKER_URL=redis://redis:6379/0
+
+  celery_beat:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    container_name: sacaudit-celery-beat
+    restart: unless-stopped
+    depends_on:
+      - redis
+      - api
+    command: celery -A config beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    environment:
+      - DJANGO_DEBUG=False
+      - SACARF_API_BASE_URL=http://sacarf-api:8000/api/v1
+      - CELERY_BROKER_URL=redis://redis:6379/0
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+    container_name: sacaudit-frontend
+    restart: unless-stopped
+    ports:
+      - "4300:80"
+    depends_on:
+      - api
+
+volumes:
+  redis_data:
+  media_volume:
+  static_volume:
