@@ -58,18 +58,36 @@ services:
       - SACARF_API_BASE_URL=http://sacarf-api:8000/api/v1
       - CELERY_BROKER_URL=redis://redis:6379/0
 
-  frontend:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.frontend
-    container_name: sacaudit-frontend
+  nginx:
+    image: nginx:alpine
+    container_name: sacaudit-nginx
     restart: unless-stopped
     ports:
-      - "4300:80"
+      - "8080:80"
     depends_on:
       - api
+      - grafana
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: sacaudit-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    environment:
+      - GF_INSTALL_PLUGINS=yesoreyeram-infinity-datasource
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
 
 volumes:
   redis_data:
   media_volume:
   static_volume:
+  grafana_data:

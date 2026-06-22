@@ -1,0 +1,9 @@
+apiVersion: 1
+datasources:
+  - name: SACAUDIT
+    type: yesoreyeram-infinity-datasource
+    uid: sacaudit-api
+    url: http://host.docker.internal:8001
+    access: proxy
+    isDefault: true
+    editable: true

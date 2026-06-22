@@ -72,19 +72,19 @@ La **ISO 25010** define un modelo de calidad de producto de software compuesto p
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        SACAUDIT (Auditor)                           │
 │                                                                     │
-│  ┌─────────────────────┐    ┌──────────────────────────────────┐    │
-│  │   Frontend Angular   │    │        Backend Django REST        │    │
-│  │   (Dashboard 4300)   │◄──►│        (API:8000)                │    │
-│  │                      │    │                                  │    │
-│  │  ┌────────────────┐  │    │  ┌──────────┐ ┌──────────────┐  │    │
-│  │  │ Dashboard      │  │    │  │ Collector │ │ Quality      │  │    │
-│  │  │ Eventos        │  │    │  │ (Eventos) │ │ (ISO 25010)  │  │    │
-│  │  │ Calidad        │  │    │  └─────┬────┘ └──────┬───────┘  │    │
-│  │  │ Hallazgos      │  │    │        │             │          │    │
-│  │  │ Informes       │  │    │  ┌─────▼─────────────▼───────┐  │    │
-│  │  └────────────────┘  │    │  │    SQLite / PostgreSQL     │  │    │
-│  └─────────────────────┘    │  └────────────────────────────┘  │    │
-│                             └──────────────────────────────────┘    │
+│  ┌──────────────────────┐  ┌──────────────────────────────────┐    │
+│  │       Grafana          │  │       Backend Django REST        │    │
+│  │   (Dashboards :3000)   │◄─►│       (API :8001)               │    │
+│  │                        │  │                                  │    │
+│  │ ┌────────────────────┐ │  │ ┌──────────┐ ┌──────────────┐  │    │
+│  │ │ Panel KPIs         │ │  │ │ Collector │ │ Quality      │  │    │
+│  │ │ Panel Niveles 1-5  │ │  │ │ (Eventos) │ │ (ISO 25010)  │  │    │
+│  │ │ Tabla Eventos      │ │  │ └─────┬────┘ └──────┬───────┘  │    │
+│  │ │ Tabla Hallazgos    │ │  │       │             │          │    │
+│  │ └────────────────────┘ │  │ ┌─────▼─────────────▼───────┐  │    │
+│  └──────────────────────┘   │  │   SQLite / PostgreSQL     │  │    │
+│                             │  └───────────────────────────┘  │    │
+│                             └─────────────────────────────────┘     │
 │                                        │                           │
 │                             ┌──────────▼──────────┐                │
 │                             │   Celery + Redis     │                │
@@ -114,7 +114,7 @@ La **ISO 25010** define un modelo de calidad de producto de software compuesto p
 | Backend | Python 3.12, Django 4.2, Django REST Framework |
 | Base de datos | SQLite (desarrollo), PostgreSQL (producción) |
 | Tareas asíncronas | Celery 5.x + Redis |
-| Frontend | Angular 17, Bootstrap 5, Bootstrap Icons |
+| Dashboard | Grafana + Infinity Datasource (JSON API plugin) |
 | Informes PDF | ReportLab 5.x |
 | Cliente HTTP | Requests (polling a SACARF) |
 
@@ -284,71 +284,31 @@ audit-system/
 │           ├── views.py              # /api/reports/...
 │           ├── pdf_generator.py      # Generación PDF con ReportLab
 │           └── tasks.py              # Generación automática
-├── frontend/                         # Dashboard Angular
-│   ├── angular.json
-│   ├── package.json
-│   └── src/
-│       ├── index.html
-│       ├── main.ts
-│       ├── styles.scss
-│       └── app/
-│           ├── app.module.ts
-│           ├── app-routing.module.ts
-│           ├── app.component.ts      # Layout con sidebar
-│           ├── core/
-│           │   ├── models/
-│           │   │   └── audit.models.ts
-│           │   └── services/
-│           │       ├── audit-event.service.ts
-│           │       ├── quality.service.ts
-│           │       └── report.service.ts
-│           └── features/
-│               ├── dashboard/        # Radar ISO 25010 + KPIs
-│               ├── events/           # Tabla de eventos + detalle
-│               ├── quality/          # Métricas por característica
-│               ├── findings/         # CRUD de hallazgos
-│               └── reports/          # Generación y descarga de PDF
 ├── docker/
 │   ├── Dockerfile.backend
-│   ├── Dockerfile.frontend
 │   ├── docker-compose.yml
-│   ├── nginx.conf
-│   └── entrypoint.sh
+│   ├── nginx.conf                    # Proxy inverso: API + Grafana
+│   ├── entrypoint.sh
+│   └── grafana/
+│       └── provisioning/
+│           ├── datasources/
+│           │   └── sacaudit.yml      # Infinity datasource → API Django
+│           └── dashboards/
+│               ├── sacaudit.yaml     # Dashboard provider
+│               └── sacaudit.json     # Dashboard con paneles KPIs, niveles, eventos, hallazgos
 └── docs/
     └── informe-auditoria-sacaudit.md  # Este documento
 ```
 
 ### 6.2. API Endpoints
 
-#### Recolección de Eventos
-
-| Método | Endpoint | Descripción |
-|--------|----------|-------------|
-| `GET` | `/api/events/` | Lista paginada de eventos auditados (filtros: event_type, user_email, date) |
-| `GET` | `/api/events/stats/` | Estadísticas: totales, por tipo, por usuario |
-| `GET` | `/api/events/{id}/` | Detalle completo de un evento (incluye old/new values) |
-
-#### Calidad ISO 25010
-
-| Método | Endpoint | Descripción |
-|--------|----------|-------------|
-| `GET` | `/api/quality/characteristics/` | Catálogo de 8 características ISO 25010 con subcaracterísticas |
-| `GET` | `/api/quality/metrics/` | Niveles de madurez calculados (filtrables por característica) |
-| `GET` | `/api/quality/metrics/latest/` | Últimos niveles por característica |
-| `GET` | `/api/quality/metrics/levels/` | Niveles de madurez (SEC, FUN, REL, MAI) con descriptores |
-| `GET` | `/api/quality/dashboard/summary/` | Resumen para el dashboard (radar + niveles + KPIs + últimos eventos) |
-| `GET` | `/api/quality/findings/` | Lista de hallazgos de auditoría |
-| `POST` | `/api/quality/findings/` | Crear hallazgo manual |
-| `PATCH` | `/api/quality/findings/{id}/` | Actualizar hallazgo (estado, acción correctiva) |
-| `GET` | `/api/quality/findings/stats/` | Estadísticas de hallazgos |
-
-#### Informes PDF
-
-| Método | Endpoint | Descripción |
-|--------|----------|-------------|
-| `GET` | `/api/reports/` | Historial de informes generados |
-| `POST` | `/api/reports/generate/` | Generar nuevo informe (body: period_start, period_end, title) |
-| `GET` | `/api/reports/{id}/download/` | Descargar PDF del informe |
+| Recurso | Endpoints | Descripción |
+|---------|-----------|-------------|
+| **Eventos** | `GET /api/events/` `GET /api/events/{id}/` `GET /api/events/stats/` | Listado paginado con filtros, detalle con old/new values, estadísticas agregadas |
+| **Características** | `GET /api/quality/characteristics/` | Catálogo de 8 características ISO 25010 con subcaracterísticas |
+| **Niveles de madurez** | `GET /api/quality/metrics/` `GET /api/quality/metrics/latest/` `GET /api/quality/metrics/levels/` `GET /api/quality/metrics/history/` `GET /api/quality/dashboard/summary/` | Niveles 1-5 con descriptores, histórico por característica, resumen para dashboard |
+| **Hallazgos** | `GET/POST /api/quality/findings/` `PATCH /api/quality/findings/{id}/` `GET /api/quality/findings/stats/` | CRUD de hallazgos clasificados como NC/OBS/STR con severidad y estado |
+| **Informes** | `GET /api/reports/` `POST /api/reports/generate/` `GET /api/reports/{id}/download/` `GET /api/reports/scheduled/` | Historial, generación bajo demanda, descarga PDF, estado de generación automática |
 
 ### 6.3. Tareas Programadas (Celery Beat)
 
@@ -363,18 +323,20 @@ audit-system/
 | `recalculate_metrics` | Reevalúa niveles de madurez (1-5) de SEC, FUN, REL, MAI | Cada 1 hora |
 | `generate_auto_report` | Genera informe PDF automático | Cada 24 horas (medianoche) |
 
-### 6.4. Dashboard Angular
+### 6.4. Dashboard Grafana
 
-El frontend consta de 5 vistas principales:
+El frontend visual se reemplazó por **Grafana** con el plugin **Infinity Datasource** que consulta directamente los endpoints REST de Django. El dashboard provisionado automáticamente incluye:
 
-| Ruta | Componente | Contenido |
-|------|-----------|-----------|
-| `/dashboard` | DashboardComponent | Radar chart con puntajes por característica, tarjetas KPI (puntaje global, eventos totales, hallazgos abiertos, características en nivel conforme (≥ 4)), últimos 10 eventos |
-| `/events` | EventListComponent | Tabla paginada y filtrable (tipo, usuario, rango de fechas), acciones de detalle |
-| `/events/:id` | EventDetailComponent | Vista detalle con old/new values en formato JSON |
-| `/quality` | QualityMetricsComponent | Tarjetas por cada nivel de madurez (SEC, FUN, REL, MAI) con barra de progreso 1-5, descriptor actual y lista de todos los niveles |
-| `/findings` | FindingsComponent | Tabla de hallazgos + formulario modal para crear/editar, botón de cierre |
-| `/reports` | ReportsComponent | Historial de informes + formulario modal para generar nuevo + descarga PDF |
+| Sección | Paneles | Endpoint consultado |
+|---------|---------|-------------------|
+| **KPIs** | Puntaje global, eventos auditados, hallazgos abiertos, características conformes | `/api/quality/dashboard/summary/` |
+| **Niveles de madurez** | Barra horizontal con nivel 1-5 por característica + tabla con descriptores | `/api/quality/metrics/levels/` |
+| **Eventos** | Tabla con últimos 20 eventos (tipo, acción, usuario, fecha) | `/api/events/?ordering=-timestamp` |
+| **Hallazgos** | Tabla de hallazgos + contadores por tipo (NC, OBS, STR) | `/api/quality/findings/` + `/api/quality/findings/stats/` |
+
+**CRUD de hallazgos**: Se accede desde el admin de Django (`/admin/`) para crear, editar y cerrar hallazgos.
+
+**Generación de informes**: Endpoint `POST /api/reports/generate/` desde cualquier cliente HTTP o tarea programada.
 
 ---
 
@@ -389,7 +351,7 @@ El frontend consta de 5 vistas principales:
 | 5 | **Hallazgos clasificados** | No Conformidades, Observaciones y Fortalezas con severidad y estado | `AuditFinding` model |
 | 6 | **Informes auditables** | PDF con estructura formal (introducción, métricas, hallazgos, conclusiones) | `AuditReportPDF` (ReportLab) |
 | 7 | **Monitoreo continuo** | Tareas Celery programadas recolectan datos periódicamente | `collector/tasks.py` |
-| 8 | **Dashboard visual** | Interfaz web con radar chart, KPIs, tablas filtrables | Frontend Angular |
+| 8 | **Dashboard visual** | Dashboards Grafana con Infinity Datasource (KPIs, niveles 1-5, eventos, hallazgos) | Grafana + Infinity plugin |
 | 9 | **Evidencia almacenada** | Respuestas originales de API preservadas como `raw_response` | `AuditEvent.raw_response` |
 | 10 | **Generación automática** | Informes PDF generados sin intervención manual cada 24h | `reports/tasks.py` |
 
@@ -399,12 +361,14 @@ El frontend consta de 5 vistas principales:
 
 ### 8.1. Dashboard
 
-El dashboard de SACAUDIT permite visualizar:
+El dashboard de **Grafana** (puerto 3000, auto-provisionado) permite visualizar:
 
-- **Radar Chart ISO 25010**: Puntaje porcentual convertido desde nivel de madurez en cada característica
+- **Barra de niveles de madurez**: Las 4 características evaluadas (SEC, FUN, REL, MAI) con su nivel 1-5 codificado por color (rojo ≤ 2, amarillo = 3, verde ≥ 4)
 - **KPIs principales**: Puntaje global, total de eventos auditados, hallazgos abiertos, características en nivel conforme (≥ 4)
-- **Tabla de niveles de madurez**: Las 4 características evaluadas (SEC, FUN, REL, MAI) con su nivel 1-5, descriptor actual y estado (cumple/observación/no cumple)
+- **Tabla de descriptores**: Código, nivel actual, estado y descriptor textual de cada característica
 - **Últimos eventos**: Lista en tiempo real de los eventos más recientes recolectados de SACARF
+- **Hallazgos**: Tabla completa con tipo (NC/OBS/STR), severidad, característica y estado
+- **Contadores de hallazgos**: Resumen numérico de No Conformidades, Observaciones y Fortalezas
 
 ### 8.2. Informe PDF
 
@@ -433,10 +397,9 @@ Los hallazgos se clasifican en:
 ### 9.1. Requisitos
 
 - Python 3.12+
-- Node.js 20+
-- Redis (para Celery)
+- Docker y Docker Compose
 
-### 9.2. Instalación Local
+### 9.2. Inicio rápido (Docker + local)
 
 ```bash
 # 1. Backend
@@ -449,31 +412,43 @@ pip install -r requirements.txt
 python manage.py migrate
 python manage.py seed_iso25010
 
-# 3. Iniciar servidor
-python manage.py runserver 0.0.0.0:8000
+# 3. Iniciar backend
+python manage.py runserver 0.0.0.0:8001 &
 
-# 4. Celery (en otra terminal)
-celery -A config worker --loglevel=info
-celery -A config beat --loglevel=info
+# 4. Celery worker + beat
+celery -A config worker --loglevel=info &
+celery -A config beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler &
 
-# 5. Frontend
-cd ../frontend
-npm install
-npm start  # Disponible en http://localhost:4300
+# 5. Iniciar Grafana (Docker)
+cd ..
+chcon -Rt svirt_sandbox_file_t docker/grafana/provisioning/ 2>/dev/null || true
+docker run -d --name sacaudit-grafana \
+  --add-host host.docker.internal:host-gateway \
+  -p 3000:3000 \
+  -e GF_INSTALL_PLUGINS=yesoreyeram-infinity-datasource \
+  -e GF_SECURITY_ADMIN_PASSWORD=admin \
+  -v $(pwd)/docker/grafana/provisioning:/etc/grafana/provisioning \
+  grafana/grafana:latest
 ```
 
-### 9.3. Ejecución con Docker
+### 9.3. Instalación completa con Docker Compose
 
 ```bash
-cd audit-system
+# Todos los servicios en contenedores (requiere construir imagen backend)
 docker-compose -f docker/docker-compose.yml up --build
 ```
 
+> **Nota**: En sistemas con SELinux (Fedora, RHEL, CentOS), ejecutar antes:
+> `chcon -Rt svirt_sandbox_file_t docker/grafana/provisioning/`
+
 Servicios:
-| Servicio | Puerto | URL |
-|----------|--------|-----|
-| Frontend | 4300 | http://localhost:4300 |
-| API | 8001 | http://localhost:8001/api/ |
+
+Servicios:
+| Servicio | Puerto | URL | Acceso |
+|----------|--------|-----|--------|
+| Nginx (proxy unificado) | 8080 | http://localhost:8080 | Root → Grafana; /api/ → Django |
+| Grafana | 3000 | http://localhost:3000 | Dashboard (admin/admin) |
+| API Django | 8001 | http://localhost:8001/api/ | Admin en /admin/ |
 
 ---
 
@@ -487,7 +462,7 @@ Servicios:
 
 4. La generación de informes PDF estructurados con niveles de madurez proporciona evidencia documentada para procesos de certificación de calidad.
 
-5. El dashboard visual facilita la interpretación de los niveles de madurez de calidad por parte de los stakeholders no técnicos.
+5. El dashboard en **Grafana** con datos en tiempo real desde la API REST facilita la interpretación de los niveles de madurez de calidad por parte de los stakeholders no técnicos.
 
 ## 11. Recomendaciones
 

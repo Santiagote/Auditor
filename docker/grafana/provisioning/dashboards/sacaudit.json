@@ -1,0 +1,342 @@
+{
+  "title": "SACAUDIT — Auditoría de Calidad ISO 25010",
+  "description": "Dashboard principal de SACAUDIT. Muestra niveles de madurez 1-5, eventos auditados y hallazgos.",
+  "tags": ["sacaudit", "iso25010", "auditoria"],
+  "timezone": "America/Guayaquil",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [
+    {
+      "type": "row",
+      "title": "Indicadores Generales",
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}
+    },
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Puntaje Global",
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 1},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "sacaudit-api"},
+      "targets": [{
+        "refId": "A",
+        "queryType": "json",
+        "source": "url",
+        "url": "/api/quality/dashboard/summary/",
+        "root": "",
+        "format": "table",
+        "columns": [{"selector": "global_score", "text": "global_score"}]
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "orange", "value": 25},
+              {"color": "yellow", "value": 50},
+              {"color": "green", "value": 75}
+            ]
+          },
+          "mappings": []
+        }
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Eventos Auditados",
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 1},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "sacaudit-api"},
+      "targets": [{
+        "refId": "A",
+        "queryType": "json",
+        "source": "url",
+        "url": "/api/quality/dashboard/summary/",
+        "root": "",
+        "format": "table",
+        "columns": [{"selector": "total_events", "text": "total_events"}]
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "fixed", "fixedColor": "blue"}
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Hallazgos Abiertos",
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 1},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "sacaudit-api"},
+      "targets": [{
+        "refId": "A",
+        "queryType": "json",
+        "source": "url",
+        "url": "/api/quality/dashboard/summary/",
+        "root": "",
+        "format": "table",
+        "columns": [{"selector": "open_findings", "text": "open_findings"}]
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "red", "value": 1}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Características Conformes",
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 1},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "sacaudit-api"},
+      "targets": [{
+        "refId": "A",
+        "queryType": "json",
+        "source": "url",
+        "url": "/api/quality/dashboard/summary/",
+        "root": "",
+        "format": "table",
+        "columns": [{"selector": "compliant_metrics", "text": "compliant_metrics"}]
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "orange", "value": 1},
+              {"color": "green", "value": 3}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "Niveles de Madurez (1-5)",
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 5}
+    },
+    {
+      "id": 5,
+      "type": "bargauge",
+      "title": "Nivel Actual por Característica",
+      "description": "Cada barra muestra el nivel de madurez alcanzado (1-5) para cada característica evaluada",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 6},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "sacaudit-api"},
+      "targets": [{
+        "refId": "A",
+        "queryType": "json",
+        "source": "url",
+        "url": "/api/quality/metrics/levels/",
+        "root": "",
+        "format": "table",
+        "columns": [
+          {"selector": "characteristic_code", "text": "code"},
+          {"selector": "value", "text": "level", "type": "number"}
+        ]
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 5,
+          "unit": "none",
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "orange", "value": 2},
+              {"color": "yellow", "value": 3},
+              {"color": "green", "value": 4}
+            ]
+          },
+          "custom": {
+            "orientation": "horizontal",
+            "displayMode": "gradient"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "code"},
+            "properties": [{"id": "custom.displayMode", "value": "hidden"}]
+          }
+        ]
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "minVizHeight": 10,
+        "minVizWidth": 50
+      }
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "Descriptores de Niveles",
+      "description": "Descriptores textuales de cada nivel de madurez por característica",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 6},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "sacaudit-api"},
+      "targets": [{
+        "refId": "A",
+        "queryType": "json",
+        "source": "url",
+        "url": "/api/quality/metrics/levels/",
+        "root": "",
+        "format": "table",
+        "columns": [
+          {"selector": "characteristic_code", "text": "Código"},
+          {"selector": "level_label", "text": "Nivel"},
+          {"selector": "status", "text": "Estado"},
+          {"selector": "description", "text": "Descriptor Actual"}
+        ]
+      }],
+      "options": {
+        "footer": {"show": false},
+        "sortBy": [{"displayName": "Código"}]
+      }
+    },
+    {
+      "type": "row",
+      "title": "Eventos Recientes",
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 14}
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "title": "Últimos Eventos",
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 15},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "sacaudit-api"},
+      "targets": [{
+        "refId": "A",
+        "queryType": "json",
+        "source": "url",
+        "url": "/api/events/?ordering=-timestamp&page_size=20",
+        "root": "results",
+        "format": "table",
+        "columns": [
+          {"selector": "event_type", "text": "Tipo"},
+          {"selector": "action", "text": "Acción"},
+          {"selector": "user_email", "text": "Usuario"},
+          {"selector": "user_role", "text": "Rol"},
+          {"selector": "timestamp", "text": "Fecha"}
+        ]
+      }],
+      "options": {
+        "footer": {"show": false}
+      }
+    },
+    {
+      "type": "row",
+      "title": "Hallazgos",
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 25}
+    },
+    {
+      "id": 8,
+      "type": "table",
+      "title": "Hallazgos de Auditoría",
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 26},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "sacaudit-api"},
+      "targets": [{
+        "refId": "A",
+        "queryType": "json",
+        "source": "url",
+        "url": "/api/quality/findings/?ordering=-created_at",
+        "root": "results",
+        "format": "table",
+        "columns": [
+          {"selector": "finding_type", "text": "Tipo"},
+          {"selector": "severity", "text": "Severidad"},
+          {"selector": "characteristic_name", "text": "Característica"},
+          {"selector": "description", "text": "Descripción"},
+          {"selector": "status", "text": "Estado"},
+          {"selector": "created_at", "text": "Creado"}
+        ]
+      }],
+      "options": {
+        "footer": {"show": false}
+      }
+    },
+    {
+      "id": 9,
+      "type": "stat",
+      "title": "No Conformidades",
+      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 36},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "sacaudit-api"},
+      "targets": [{
+        "refId": "A",
+        "queryType": "json",
+        "source": "url",
+        "url": "/api/quality/findings/stats/",
+        "root": "",
+        "format": "table",
+        "columns": [{"selector": "by_type.NC", "text": "nc"}]
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "red", "value": 1}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "stat",
+      "title": "Observaciones",
+      "gridPos": {"h": 4, "w": 4, "x": 4, "y": 36},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "sacaudit-api"},
+      "targets": [{
+        "refId": "A",
+        "queryType": "json",
+        "source": "url",
+        "url": "/api/quality/findings/stats/",
+        "root": "",
+        "format": "table",
+        "columns": [{"selector": "by_type.OBS", "text": "obs"}]
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "fixed", "fixedColor": "orange"}
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "stat",
+      "title": "Fortalezas",
+      "gridPos": {"h": 4, "w": 4, "x": 8, "y": 36},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "sacaudit-api"},
+      "targets": [{
+        "refId": "A",
+        "queryType": "json",
+        "source": "url",
+        "url": "/api/quality/findings/stats/",
+        "root": "",
+        "format": "table",
+        "columns": [{"selector": "by_type.STR", "text": "str"}]
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "fixed", "fixedColor": "green"}
+        }
+      }
+    }
+  ]
+}
