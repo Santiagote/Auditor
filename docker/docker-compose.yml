@@ -94,6 +94,7 @@ services:
       - GF_INSTALL_PLUGINS=yesoreyeram-infinity-datasource
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_SERVER_ROOT_URL=http://localhost:3000
+      - GF_DEFAULT_LOCALE=es
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning
