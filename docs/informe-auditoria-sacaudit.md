@@ -476,5 +476,89 @@ Servicios:
 
 ---
 
+## 12. Despliegue en AWS
+
+### 12.1. Arquitectura
+
+SACAUDIT se despliega en una instancia **EC2 t2.micro** independiente de SACARF, usando Docker Compose para ejecutar todos los servicios en un solo servidor. SACARF está en otra EC2 con IP elástica propia.
+
+```
+SACARF EC2 (IP Elástica A)
+  └── API :8000
+
+SACAUDIT EC2 (IP Elástica B — t2.micro, free tier)
+  └── Docker Compose:
+      ├── Nginx       :80    (proxy unificado)
+      ├── Django API  :8000  (interno)
+      ├── Celery Worker     (polling → SACARF)
+      ├── Celery Beat       (tareas programadas)
+      ├── Redis       :6379
+      └── Grafana     :3000  (admin/admin)
+```
+
+### 12.2. Configuración para producción
+
+Se modificaron los siguientes archivos para leer variables de entorno desde un archivo `.env`:
+
+| Archivo | Cambio |
+|---------|--------|
+| `backend/config/settings.py` | `DEBUG`, `SECRET_KEY`, `ALLOWED_HOSTS`, `CELERY_BROKER_URL`, `SACARF_API_BASE_URL` leídos desde variables de entorno con valores por defecto |
+| `docker/docker-compose.yml` | Puertos cambiados a estándar (80 para nginx, 6379 para Redis), variables con `${VAR:-default}` para Docker Compose, env_file apuntando a `.env` |
+| `docker/grafana/provisioning/datasources/sacaudit.yml` | URL del datasource apunta a `http://api:8000` (nombre interno del contenedor) |
+| `.gitignore` | Se agregaron `*.pyc`, `__pycache__/`, `db.sqlite3`, `.env` |
+| `.env` | Archivo nuevo con variables configurables (no se sube a git) |
+
+### 12.3. Despliegue paso a paso
+
+```bash
+# 1. Conectarse a la EC2 de SACAUDIT
+ssh -i key.pem ec2-user@<IP-ELASTICA-SACAUDIT>
+
+# 2. Instalar Docker
+sudo yum update -y
+sudo yum install -y docker
+sudo systemctl enable docker
+sudo systemctl start docker
+sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+
+# 3. Clonar repositorio
+git clone https://github.com/Santiagote/Auditor.git
+cd Auditor
+
+# 4. Configurar variables de entorno
+echo "SACARF_API_BASE_URL=http://<IP-ELASTICA-SACARF>:8000/api/v1" > .env
+echo "DJANGO_SECRET_KEY=$(openssl rand -hex 32)" >> .env
+
+# 5. Arrancar servicios
+docker-compose -f docker/docker-compose.yml --env-file .env up -d
+
+# 6. Migraciones y datos iniciales
+docker exec sacaudit-api python manage.py migrate
+docker exec sacaudit-api python manage.py seed_iso25010
+docker exec -it sacaudit-api python manage.py createsuperuser
+```
+
+### 12.4. Servicios desplegados
+
+| Servicio | Puerto | URL | Autenticación |
+|----------|--------|-----|--------------|
+| Nginx (proxy) | 80 | http://<IP-ELASTICA>/ | Root → Grafana, /api/ → Django |
+| Grafana | 3000 | http://<IP-ELASTICA>:3000 | `admin` / `admin` |
+| Django Admin | 80 | http://<IP-ELASTICA>/admin/ | crear superusuario |
+| API REST | 80 | http://<IP-ELASTICA>/api/ | — |
+
+### 12.5. Variables de entorno
+
+| Variable | Descripción | Default |
+|----------|-------------|---------|
+| `DJANGO_DEBUG` | Modo debug (True/False) | `False` |
+| `DJANGO_SECRET_KEY` | Clave secreta de Django | — |
+| `ALLOWED_HOSTS` | Hosts permitidos separados por coma | `*` |
+| `SACARF_API_BASE_URL` | URL base de la API de SACARF | `http://host.docker.internal:8000/api/v1` |
+| `CELERY_BROKER_URL` | URL de conexión a Redis | `redis://redis:6379/0` |
+
+---
+
 *Documento generado como parte del proyecto académico de la Universidad Nacional de Loja (UNL).*
 *SACAUDIT v1.0 — Junio 2026*
